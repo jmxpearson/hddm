@@ -5,10 +5,12 @@ try:
     from Cython.Build import cythonize
     ext_modules = cythonize([Extension('wfpt', ['src/wfpt.pyx'], language='c++'),
                              Extension('cdfdif_wrapper', ['src/cdfdif_wrapper.pyx', 'src/cdfdif.c']),
+                             Extension('swfpt', ['src/swfpt.pyx'], language='c++')
     ])
 
 except ImportError:
     ext_modules = [Extension('wfpt', ['src/wfpt.c'], language='c++'),
+                   Extension('swfpt', ['src/swfpt.c'], language='c++'),
                    Extension('cdfdif_wrapper', ['src/cdfdif_wrapper.c', 'src/cdfdif.c'])
     ]
 
