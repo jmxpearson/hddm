@@ -24,7 +24,7 @@ cdef double B(int k, int j, double dv, bint sign) nogil:
     Calculate B coefficient (i, j) for drift rate difference dv.
     Use sign = 1 for B+, sign = 0 for B-
     """
-    cdef double alpha = (-1)**(sign + 1) * dv/sqrt(2)
+    cdef double alpha = (-1)**(sign + 1) * dv
 
     cdef double B = j * k * 4 * M_PI**2 * alpha;
 
