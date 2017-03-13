@@ -50,10 +50,10 @@ cdef inline double A0(int k, double v1, double z) nogil:
     """
     return sqrt(2) * sin(k * M_PI * z) * exp(-v1 * z)
 
-cdef double A(int k, int n, double v1, double v2, double z, double[:] tau) nogil:
+cdef double A(int k, int n, double v1, double v2, double z, double[:] s) nogil:
     """
     Recursively calculate coefficent A_{k, n}(z)
-    TODO: Make sure n <= len(tau)
+    TODO: Make sure n <= len(s)
     """
     if n == 0:
         return A0(k, v1, z)
@@ -65,7 +65,7 @@ cdef double A(int k, int n, double v1, double v2, double z, double[:] tau) nogil
     cdef int j
 
     for j from 1 <= j <= J:
-        acc += exp(-(j*M_PI)**2 * tau[n - 1]/2) * A(j, n - 1, v1, v2, z, tau) * B(k, j, dv, parity(n - 1))
+        acc += exp(-(j*M_PI)**2 * (s[n] - s[n - 1])/2) * A(j, n - 1, v1, v2, z, s) * B(k, j, dv, parity(n - 1))
 
     return acc
 
@@ -81,8 +81,7 @@ cdef double pdf_kernel(double tt, double w, double v1, double v2, double[:] s, i
     cdef double p
     cdef int k
     for k from 1 <= k <= K:
-        p += k * exp(-(k * M_PI)**2 * (tt - s[n])) * A(k, n, v1, v2, w, s)
-    p *= M_PI
+        p += k * exp(-(k * M_PI)**2 * (tt - s[n])/2) * A(k, n, v1, v2, w, s)
 
     return p
 
@@ -128,7 +127,7 @@ cdef double pdf(double t, double v1, double v2, double a, double z, double[:] s,
             sum_v2 += (tt - s[n]) * vv**2
 
     p *= exp(-sum_v2/2)
-    p *= p/asq
+    p *= M_PI/(sqrt(2) * asq)
 
     return p
 
