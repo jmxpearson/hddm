@@ -26,9 +26,9 @@ cdef double B(int k, int j, double dv, bint sign) nogil:
     """
     cdef double alpha = (-1)**(sign + 1) * dv
 
-    cdef double B = j * k * 4 * M_PI**2 * alpha;
+    cdef double B = 4 * M_PI**2 * j * k * alpha;
 
-    B *= exp(alpha) * (-1)**(j + k) - 1
+    B *= (-1)**(j + k) * exp(alpha) - 1
 
     B /= (alpha**4 + 2 * M_PI**2 * alpha**2 * (j**2 + k**2) +
           M_PI**4 * (j**2 - k**2))
@@ -38,34 +38,34 @@ cdef double B(int k, int j, double dv, bint sign) nogil:
 def BB(k, j, dv, s):
     return B(k, j, dv, s)
 
+cdef inline bint parity(int n) nogil:
+    """
+    Return 1 if n even, 0 if odd.
+    """
+    return n % 2 == 0
+
 cdef inline double A0(int k, double v1, double z) nogil:
     """
     Returns A_{k,1}(v, z)
     """
-    return sqrt(2) * sin(k * M_PI * z) * exp(-v1 * z/2)
+    return sqrt(2) * sin(k * M_PI * z) * exp(-v1 * z)
 
-cdef double A(int k, int n, double v1, double v2, double z, double[:] s) nogil:
+cdef double A(int k, int n, double v1, double v2, double z, double[:] tau) nogil:
     """
     Recursively calculate coefficent A_{k, n}(z)
-    TODO: Make sure n <= len(s)
+    TODO: Make sure n <= len(tau)
     """
     if n == 0:
         return A0(k, v1, z)
 
     cdef int J = 4  # TODO: replace with principled bound
-
-    cdef double ds = 0
-    if n == 1:
-        ds = s[0]
-    else:
-        ds = s[n - 1] - s[n - 2]
-
     cdef double dv = v1 - v2
+
     cdef double acc = 0
     cdef int j
 
     for j from 1 <= j <= J:
-        acc += exp(-(j*M_PI)**2 * ds) * A(j, n - 1, v1, v2, z, s) * B(k, j, dv, n % 2)
+        acc += exp(-(j*M_PI)**2 * tau[n - 1]/2) * A(j, n - 1, v1, v2, z, tau) * B(k, j, dv, parity(n - 1))
 
     return acc
 
