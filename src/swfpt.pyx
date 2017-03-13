@@ -7,14 +7,9 @@
 
 import hddm
 
-import scipy.integrate as integrate
-from copy import copy
 import numpy as np
 
 cimport numpy as np
 cimport cython
-
-from cython.parallel import *
-#cimport openmp
 
 include "spdf.pxi"

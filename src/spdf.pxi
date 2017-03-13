@@ -62,7 +62,7 @@ cdef double A(int k, int n, double v1, double v2, double z, double[:] s) nogil:
     cdef double dv = v1 - v2
 
     cdef double acc = 0
-    cdef int j
+    cdef Py_ssizt_t j
 
     for j from 1 <= j <= J:
         acc += exp(-(j*M_PI)**2 * (s[n] - s[n - 1])/2) * A(j, n - 1, v1, v2, z, s) * B(k, j, dv, parity(n - 1))
@@ -79,7 +79,7 @@ cdef double pdf_kernel(double tt, double w, double v1, double v2, double[:] s, i
     cdef int K = 4
 
     cdef double p
-    cdef int k
+    cdef Py_ssize_t k
     for k from 1 <= k <= K:
         p += k * exp(-(k * M_PI)**2 * (tt - s[n])/2) * A(k, n, v1, v2, w, s)
 
@@ -102,11 +102,11 @@ cdef double pdf(double t, double v1, double v2, double a, double z, double[:] s,
     cdef double vv1 = a * v1
     cdef double vv2 = a * v2
     cdef double[:] ss = s
-    cdef int ii
+    cdef Py_ssize_t ii
     for ii in range(ss.shape[0]):
         ss[ii] /= asq
 
-    cdef int n
+    cdef Py_ssize_t n
     # find n(tt)
     # this is okay for short lists s, but is terrible for long ones
     # eventually, should replace this with binary search, since s is sorted
@@ -130,6 +130,25 @@ cdef double pdf(double t, double v1, double v2, double a, double z, double[:] s,
     p *= M_PI/(sqrt(2) * asq)
 
     return p
+
+# cdef double pdf_sv(double t, double v1, double v2, double sv, double a, double z, double[:] s, double err) nogil:
+#     """
+#     Compute the pdf after integrating over trial-to-trial noise (sv) in
+#     the diffiusion rate (v). This can be done analytically.
+#     """
+#     if t <= 0:
+#         return 0
+#
+#     if sv == 0:
+#         return pdf(t, v1, v2, a, z, s, err)
+#
+#     # fix later
+#     return pdf(t, v1, v2, a, z, s, err)
+
+cpdef double full_pdf(double t, double v1, double v2, double sv, double a, double z, double sz, double[:] s, double tnd, double st, double err, int n_st=2, int n_sz=2, bint use_adaptive=1, double simps_err=1e-3) nogil:
+    """full pdf"""
+
+    return pdf(t, v1, v2, a, z, s, err)
 
 
 def AA(k, n, v1, v2, z, ds):
