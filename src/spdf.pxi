@@ -107,14 +107,14 @@ cdef double pdf(double t, double v1, double v2, double a, double z, double[:] s,
     for ii in range(ss.shape[0]):
         ss[ii] /= asq
 
-    cdef Py_ssize_t n
     # find n(tt)
     # this is okay for short lists s, but is terrible for long ones
     # eventually, should replace this with binary search, since s is sorted
-    for n in range(s.shape[0]):
-        if s[n] > tt:
+    cdef Py_ssize_t n = ss.shape[0] - 1
+    for ii in range(ss.shape[0]):
+        if ss[ii] > tt:
+            n = ii - 1
             break
-    n -= 1
 
     cdef double p = pdf_kernel(tt, w, vv1, vv2, ss, n, err)
 
@@ -152,14 +152,14 @@ cpdef double full_pdf(double x, double v1, double v2, double sv, double a, doubl
     # Check if parpameters are valid
     if (z<0) or (z>1) or (a<0) or (t<0) or (st<0) or (sv<0) or (sz<0) or (sz>1) or \
        ((fabs(x)-(t-st/2.))<0) or (z+sz/2.>1) or (z-sz/2.<0) or (t-st/2.<0):
-        return 0
+       return 0
 
     cdef Py_ssize_t ii
     for ii in range(1, s.shape[0]):
         if s[ii] <= s[ii - 1]:
             return 0
 
-    return pdf(t, v1, v2, a, z, s, err)
+    return pdf(x, v1, v2, a, z, s, err)
 
 
 def AA(k, n, v1, v2, z, ds):
