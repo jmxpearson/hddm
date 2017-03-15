@@ -5,6 +5,8 @@
 #cython: boundscheck=False
 
 cimport cython
+from libc.stdlib cimport malloc, free
+from cython cimport view
 
 cdef extern from "math.h" nogil:
     double sin(double)
@@ -78,45 +80,69 @@ cdef double pdf_kernel(double tt, double w, double v1, double v2, double[:] s, i
 
     # TODO: compute number of terms needed...
     cdef int K = 4
+    cdef double *A = <double *> malloc(K * sizeof(double))
+    cdef double *tmp = <double *> malloc(K * sizeof(double))
 
-    cdef double p
-    cdef Py_ssize_t k
+    cdef double p = 0
+    cdef Py_ssize_t k, j, nn
+    cdef double tau
+    cdef double dv = v1 - v2
+
+    # initialize buffers
     for k in range(1, K + 1):
-        p += k * exp(-(k * M_PI)**2 * (tt - s[n])/2) * A(k, n, v1, v2, w, s)
+        A[k - 1] = A0(k, v1, w)
+        tmp[k - 1] = 0
+
+    # do nn in [0, n - 1]
+    for nn in range(n):
+        if nn == 0:
+            tau = s[0]
+        else:
+            tau = s[nn] - s[nn - 1]
+
+        for k in range(1, K + 1):
+            # calculate A(k, nn + 1)
+            for j in range(1, K + 1):
+                tmp[k - 1] += exp(-(j * M_PI)**2 * tau/2) * B(k, j, dv, parity(n)) * A[j - 1]
+
+        # copy temporary buffer to A
+        # reset temporary buffer
+        for k in range(K):
+            A[k] = tmp[k]
+            tmp[k] = 0
+
+
+    for k in range(1, K + 1):
+        p += k * exp(-(k * M_PI)**2 * (tt - s[n])/2) * A[k - 1]
+
+    free(A)
+    free(tmp)
 
     return p
 
 cdef double pdf(double t, double v1, double v2, double a, double z, double[:] s, double err) nogil:
     """
     Compute the likelihood of the switching drift diffusion model
-    f(t|v, a, z, s) with switch times given by the array s.
+    f(t|v1, v2, a, z, s) with switch times given by the array s.
     v1 is the drift velocity for the first time segment, after which
     diffusion alternates between v1 and v2.
     """
     if t <= 0:
         return 0
 
-    # convert to normalized values
-    cdef double asq = a**2
-    cdef double tt = t/asq
-    cdef double w = z/a
-    cdef double vv1 = a * v1
-    cdef double vv2 = a * v2
-    cdef double[:] ss = s
-    cdef Py_ssize_t ii
-    for ii in range(ss.shape[0]):
-        ss[ii] /= asq
+    cdef Py_ssize_t NS = s.shape[0]
 
     # find n(tt)
     # this is okay for short lists s, but is terrible for long ones
     # eventually, should replace this with binary search, since s is sorted
-    cdef Py_ssize_t n = ss.shape[0] - 1
-    for ii in range(ss.shape[0]):
-        if ss[ii] > tt:
+    cdef Py_ssize_t ii
+    cdef Py_ssize_t n = NS - 1
+    for ii in range(NS):
+        if s[ii] > t:
             n = ii - 1
             break
 
-    cdef double p = pdf_kernel(tt, w, vv1, vv2, ss, n, err)
+    cdef double p = pdf_kernel(t, z, v1, v2, s, n, err)
 
     cdef double vv
     cdef double sum_v2 = 0
@@ -125,10 +151,10 @@ cdef double pdf(double t, double v1, double v2, double a, double z, double[:] s,
         if ii <= n:
             sum_v2 += (s[ii] - s[ii - 1]) * vv**2
         else:
-            sum_v2 += (tt - s[n]) * vv**2
+            sum_v2 += (t - s[n]) * vv**2
 
     p *= exp(-sum_v2/2)
-    p *= M_PI/(sqrt(2) * asq)
+    p *= M_PI/(sqrt(2) * a**2)
 
     return p
 
@@ -150,16 +176,25 @@ cpdef double full_pdf(double x, double v1, double v2, double sv, double a, doubl
     """full pdf"""
 
     # Check if parpameters are valid
-    if (z<0) or (z>1) or (a<0) or (t<0) or (st<0) or (sv<0) or (sz<0) or (sz>1) or \
+    if (z<0) or (z>a) or (a<0) or (t<0) or (st<0) or (sv<0) or (sz<0) or (sz>1) or \
        ((fabs(x)-(t-st/2.))<0) or (z+sz/2.>1) or (z-sz/2.<0) or (t-st/2.<0):
        return 0
 
     cdef Py_ssize_t ii
     for ii in range(1, s.shape[0]):
         if s[ii] <= s[ii - 1]:
-            return 0
+            return 0  # should probably be an error/warning
 
-    return pdf(x, v1, v2, a, z, s, err)
+    # convert to normalized values
+    cdef double asq = a**2
+    cdef double tt = x/asq
+    cdef double w = z/a
+    cdef double vv1 = a * v1
+    cdef double vv2 = a * v2
+    # make ss here!
+    cdef double[:] ss = s
+
+    return pdf(tt, vv1, vv2, a, w, ss, err)
 
 
 def AA(k, n, v1, v2, z, ds):

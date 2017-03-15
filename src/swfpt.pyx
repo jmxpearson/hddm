@@ -24,7 +24,6 @@ def pdf_array(np.ndarray[double, ndim=1] x, double v1, double v2, double sv, dou
 
     # for i in prange(size, nogil=True):
     for i in range(size):
-        print(i)
         y[i] = full_pdf(x[i], v1, v2, sv, a, z, sz, s, t, st, err, n_st, n_sz, use_adaptive, simps_err)
 
     y = y * (1 - p_outlier) + (w_outlier * p_outlier)
