@@ -53,26 +53,26 @@ cdef inline double A0(int k, double v1, double z) nogil:
     """
     return sqrt(2) * sin(k * M_PI * z) * exp(-v1 * z)
 
-cdef double A(int k, int n, double v1, double v2, double z, double[:] s) nogil:
-    """
-    Recursively calculate coefficent A_{k, n}(z)
-    TODO: Make sure n <= len(s)
-    """
-    if n == 0:
-        return A0(k, v1, z)
+# cdef double A(int k, int n, double v1, double v2, double z, double[:] s) nogil:
+#     """
+#     Recursively calculate coefficent A_{k, n}(z)
+#     TODO: Make sure n <= len(s)
+#     """
+#     if n == 0:
+#         return A0(k, v1, z)
+#
+#     cdef int J = 4  # TODO: replace with principled bound
+#     cdef double dv = v1 - v2
+#
+#     cdef double acc = 0
+#     cdef Py_ssize_t j
+#
+#     for j in range(1, J + 1):
+#         acc += exp(-(j*M_PI)**2 * (s[n] - s[n - 1])/2) * A(j, n - 1, v1, v2, z, s) * B(k, j, dv, parity(n - 1))
+#
+#     return acc
 
-    cdef int J = 4  # TODO: replace with principled bound
-    cdef double dv = v1 - v2
-
-    cdef double acc = 0
-    cdef Py_ssize_t j
-
-    for j in range(1, J + 1):
-        acc += exp(-(j*M_PI)**2 * (s[n] - s[n - 1])/2) * A(j, n - 1, v1, v2, z, s) * B(k, j, dv, parity(n - 1))
-
-    return acc
-
-cdef double pdf_kernel(double tt, double w, double v1, double v2, double[:] s, int n, double err) nogil:
+cdef double pdf_kernel(double tt, double w, double v1, double v2, double* s, int n, double err) nogil:
     """
     Compute the (infinite) sum piece of the pdf using dimensionless
     variables.
@@ -120,7 +120,7 @@ cdef double pdf_kernel(double tt, double w, double v1, double v2, double[:] s, i
 
     return p
 
-cdef double pdf(double t, double v1, double v2, double a, double z, double[:] s, double err) nogil:
+cdef double pdf(double t, double v1, double v2, double a, double z, double* s, Py_ssize_t NS, double err) nogil:
     """
     Compute the likelihood of the switching drift diffusion model
     f(t|v1, v2, a, z, s) with switch times given by the array s.
@@ -129,8 +129,6 @@ cdef double pdf(double t, double v1, double v2, double a, double z, double[:] s,
     """
     if t <= 0:
         return 0
-
-    cdef Py_ssize_t NS = s.shape[0]
 
     # find n(tt)
     # this is okay for short lists s, but is terrible for long ones
@@ -192,10 +190,17 @@ cpdef double full_pdf(double x, double v1, double v2, double sv, double a, doubl
     cdef double vv1 = a * v1
     cdef double vv2 = a * v2
     # make ss here!
-    cdef double[:] ss = s
+    cdef Py_ssize_t NS = s.shape[0]
+    cdef double* ss = <double *>malloc(NS * sizeof(double))
+    for ii in range(NS):
+        ss[ii] = s[ii]/asq
 
-    return pdf(tt, vv1, vv2, a, w, ss, err)
+    cdef double p = pdf(tt, vv1, vv2, a, w, ss, NS, err)
+
+    free(ss)
+
+    return p
 
 
-def AA(k, n, v1, v2, z, ds):
-    return A(k, n, v1, v2, z, ds)
+# def AA(k, n, v1, v2, z, ds):
+#     return A(k, n, v1, v2, z, ds)
