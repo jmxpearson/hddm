@@ -9,7 +9,7 @@ import pymc as pm
 import numpy as np
 import pandas as pd
 import nose
-pd.set_printoptions(precision=4)
+pd.set_option("precision",4)
 from nose import SkipTest
 
 import hddm
