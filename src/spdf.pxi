@@ -34,7 +34,7 @@ cdef double B(int k, int j, double dv, bint sign) nogil:
     B *= (-1)**(j + k) * exp(alpha) - 1
 
     B /= (alpha**4 + 2 * M_PI**2 * alpha**2 * (j**2 + k**2) +
-          M_PI**4 * (j**2 - k**2))
+          M_PI**4 * (j**2 - k**2)**2)
 
     return B
 
