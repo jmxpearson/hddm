@@ -53,6 +53,9 @@ cdef inline double A0(int k, double v1, double z) nogil:
     """
     return sqrt(2) * sin(k * M_PI * z) * exp(-v1 * z)
 
+def AA0(k, v1, z):
+  return A0(k, v1, z)
+
 # cdef double A(int k, int n, double v1, double v2, double z, double[:] s) nogil:
 #     """
 #     Recursively calculate coefficent A_{k, n}(z)
