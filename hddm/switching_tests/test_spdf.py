@@ -18,6 +18,9 @@ class TestABParams(unittest.TestCase):
         A = np.exp(-v * y) * np.sqrt(2) * np.sin(k* np.pi * y)
         return A
 
+    def getExpectedValueAkj(self, k, v, y):
+        A = 0
+        return A
 
     def test_check_B(self, size=100):
         j = 1
@@ -46,7 +49,7 @@ class TestABParams(unittest.TestCase):
         np.testing.assert_almost_equal(m, B)
 
         #check time for matrix version
-        t1_begin = time.time()
+        #t1_begin = time.time()
         nj, nk, ndv, nsign = (10, 10, 10, 2)
         k = np.arange(1, nk)
         j = np.arange(1, nj)
@@ -57,25 +60,13 @@ class TestABParams(unittest.TestCase):
         expValue = self.getExpectedValueB(xk, xj, xdv, xsign)
         m = vfunc(xk, xj, xdv, xsign)
         np.testing.assert_almost_equal(m, expValue)
-        t1_end = time.time()
+        #t1_end = time.time()
 
-
-        #check time for loop
-        t2_begin = time.time()
-        for j1 in j:
-            for k1 in k:
-                for dv1 in dv:
-                    for sign1 in sign:
-                        expValue = self.getExpectedValueB(k1, j1, dv1, sign1)
-                        m = swfpt.BB(k1, j1, dv1, sign1)
-                        np.testing.assert_almost_equal(m, expValue)
-        t2_end = time.time()
-
-        print ("matrix-time:", t1_end - t1_begin, " loop-time:", t2_end-t2_begin)
+        #print ("matrix-time:", t1_end - t1_begin, " loop-time:", t2_end-t2_begin)
         #Values are around : matrix-time: 0.0009610652923583984  loop-time: 0.05646038055419922
 
 
-    def test_check_A(self, size=100):
+    def test_check_Ak0(self, size=100):
         k = 1
         v = 0
         y = 0
@@ -93,15 +84,17 @@ class TestABParams(unittest.TestCase):
 
 
         nk, nv, ny = (10, 10, 10)
-        k = np.arange(1, nk)
+        k = np.arange(1, nk+1)
         v = np.linspace(0.0, 5.0, num=nv)
         y = np.linspace(0.0, 5.0, num=ny)
         kx, vx, yx = np.meshgrid(k, v, y)
         A_k_0 = self.getExpectedValueAk0(kx, vx, yx)
-        #A_k_0_cy = swfpt.AA0(kx, vx, yx)
-        #np.testing.assert_almost_equal(A_k_0_cy, A_k_0)
+        vfunc = np.vectorize(swfpt.AA0)
+        A_k_0_cy = vfunc(kx, vx, yx)
+        np.testing.assert_almost_equal(A_k_0_cy, A_k_0)
 
 if __name__ == "__main__":
     test = TestABParams()
     test.test_check_B()
+    test.test_check_Ak0()
 
