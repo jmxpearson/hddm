@@ -98,15 +98,12 @@ cdef double pdf_kernel(double tt, double w, double v1, double v2, double* s, int
 
     # do nn in [0, n - 1]
     for nn in range(n):
-        if nn == 0:
-            tau = s[0]
-        else:
-            tau = s[nn] - s[nn - 1]
+        tau = s[nn+1] - s[nn]
 
         for k in range(1, K + 1):
             # calculate A(k, nn + 1)
             for j in range(1, K + 1):
-                tmp[k - 1] += exp(-(j * M_PI)**2 * tau/2) * B(k, j, dv, parity(n)) * A[j - 1]
+                tmp[k - 1] += exp(-(j * M_PI)**2 * tau/2) * B(k, j, dv, parity(nn)) * A[j - 1]
 
         # copy temporary buffer to A
         # reset temporary buffer
@@ -147,8 +144,8 @@ cdef double pdf(double t, double v1, double v2, double a, double z, double* s, P
 
     cdef double vv
     cdef double sum_v2 = 0
-    for ii in range(1, n + 1):
-        vv = v1 if ii % 2 else v2
+    for ii in range(1, n + 2):
+        vv = v2 if ii % 2 else v1
         if ii <= n:
             sum_v2 += (s[ii] - s[ii - 1]) * vv**2
         else:
@@ -194,9 +191,17 @@ cpdef double full_pdf(double x, double v1, double v2, double sv, double a, doubl
     cdef double vv2 = a * v2
     # make ss here!
     cdef Py_ssize_t NS = s.shape[0]
+    cdef Py_ssize_t s_orig_size = s.shape[0]
+    cdef int start_iter = 0
+    if s[0] != 0:
+        NS = NS+1
+        start_iter = 1
     cdef double* ss = <double *>malloc(NS * sizeof(double))
-    for ii in range(NS):
-        ss[ii] = s[ii]/asq
+    ss[0] = 0
+    cdef int i = start_iter
+    for ii in range(s_orig_size):
+        ss[i] = s[ii]/asq
+        i = i+1
 
     cdef double p = pdf(tt, vv1, vv2, a, w, ss, NS, err)
 

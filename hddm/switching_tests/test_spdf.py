@@ -1,9 +1,11 @@
 import unittest
 import numpy as np
-import matplotlib.pyplot as plt
-import time
+# import matplotlib.pyplot as plt
+# import time
 
 import swfpt
+import bisect
+
 
 class TestABParams(unittest.TestCase):
     def runTest(self):
@@ -15,7 +17,7 @@ class TestABParams(unittest.TestCase):
         return B
 
     def getExpectedValueAk0(self, k, v, y):
-        A = np.exp(-v * y) * np.sqrt(2) * np.sin(k* np.pi * y)
+        A = np.exp(-v * y) * np.sqrt(2) * np.sin(k * np.pi * y)
         return A
 
     def getExpectedValueAkj(self, k, v, y):
@@ -28,9 +30,9 @@ class TestABParams(unittest.TestCase):
         dv = 0
         sign = 0
         m = swfpt.BB(k, j, dv, sign)
-        np.testing.assert_almost_equal(m,0);
+        np.testing.assert_almost_equal(m, 0)
 
-        #Sign is negative
+        # Sign is negative
         j = 1
         k = 1
         dv = 1
@@ -39,7 +41,7 @@ class TestABParams(unittest.TestCase):
         m = swfpt.BB(k, j, dv, sign)
         np.testing.assert_almost_equal(m, expected)
 
-        #Sign is positive
+        # Sign is positive
         sign = 0
         expected = 0.61650432
         m = swfpt.BB(k, j, dv, sign)
@@ -48,8 +50,7 @@ class TestABParams(unittest.TestCase):
         np.testing.assert_almost_equal(B, expected)
         np.testing.assert_almost_equal(m, B)
 
-        #check time for matrix version
-        #t1_begin = time.time()
+        # check time for matrix version
         nj, nk, ndv, nsign = (10, 10, 10, 2)
         k = np.arange(1, nk)
         j = np.arange(1, nj)
@@ -60,11 +61,6 @@ class TestABParams(unittest.TestCase):
         expValue = self.getExpectedValueB(xk, xj, xdv, xsign)
         m = vfunc(xk, xj, xdv, xsign)
         np.testing.assert_almost_equal(m, expValue)
-        #t1_end = time.time()
-
-        #print ("matrix-time:", t1_end - t1_begin, " loop-time:", t2_end-t2_begin)
-        #Values are around : matrix-time: 0.0009610652923583984  loop-time: 0.05646038055419922
-
 
     def test_check_Ak0(self, size=100):
         k = 1
@@ -82,7 +78,6 @@ class TestABParams(unittest.TestCase):
         A_k_0_cy = swfpt.AA0(k, v, y)
         np.testing.assert_almost_equal(A_k_0_cy, A_k_0)
 
-
         nk, nv, ny = (10, 10, 10)
         k = np.arange(1, nk+1)
         v = np.linspace(0.0, 5.0, num=nv)
@@ -93,85 +88,124 @@ class TestABParams(unittest.TestCase):
         A_k_0_cy = vfunc(kx, vx, yx)
         np.testing.assert_almost_equal(A_k_0_cy, A_k_0)
 
-    # tt - time for which pdf is wanted
-    # w - z/a normalized
-    # v1 - diffusion rate 1
-    # v2 - diffusion rate 2
-    # s - Switching times
-    # n - number of elements in s before time t
+    #  tt - time for which pdf is wanted
+    #  w - z/a normalized
+    #  v1 - diffusion rate 1
+    #  v2 - diffusion rate 2
+    #  s - Switching times
+    #  n - number of elements in s before time t
 
     def calculate_Ak(self, tt, w, v1, v2, s, n, err):
-        K = 2
+        K = 4
         A = np.array(np.zeros(K), dtype=np.double)
         tmp = np.array(np.zeros(K), dtype=np.double)
         k_val = np.arange(1, K+1)
         tmp = np.zeros_like(tmp)
-        if (s[0] != 0):
-           s = np.insert(s, 0, 0)
-        diff = np.ediff1d(s)
+        diff = np.diff(s)
 
-        #get dv
+        # get dv
         dv = v1 - v2
-        #starting value of A
+        # starting value of A
         A = self.getExpectedValueAk0(k_val, v1, w)
-        print ("A:", A)
 
-        #Calculate B matrix to be used
-        nj, nk, nsign = (2, 2, 2)
+        # Calculate B matrix to be used
+        nj, nk, nsign = (K, K, 2)
         k = np.arange(1, nk+1)
         j = np.arange(1, nj+1)
         sign = np.arange(0, nsign)
         xk, xj, xsign = np.meshgrid(k, j, sign)
         B = self.getExpectedValueB(xk, xj, dv, xsign)
-        print ("B:", B)
+        vfunc = np.vectorize(swfpt.BB)
+        m = vfunc(xk, xj, dv, xsign)
+        np.testing.assert_almost_equal(m, B)
 
-        #calculate lambda in array format
-        lambda_arr = (k**2) * (np.pi**2) / 2
+        # starting value of A
+        A = self.getExpectedValueAk0(k_val, v1, w)
+        vfunc1 = np.vectorize(swfpt.AA0)
+        A_k_0_cy = vfunc1(k_val, v1, w)
+        np.testing.assert_almost_equal(A_k_0_cy, A)
 
-        #Array with one row for each lambda, one column for each time itertion tau
-        mul_factor = np.exp(-np.outer(lambda_arr, diff))
-
-
-        #Start with sign 0 and flip back and forth in every iteration
-        sign = 0
-        #going from 1 to n, calculate A-s iteratively
-        for i in range(n):
-            tau = diff[i-1] #difference from previous switching value
-            A = A * mul_factor[:, i-1]
-            #Multiply with B matrix for particular sign
-            A = np.dot(B[:,:,sign], A)
-            print ("iter:", i)
-            print (A)
+        # Loop version
+        sign = 1
+        for i in range(0, n):
+            tau = diff[i]  # difference from previous switching value
+            for k in range(1, K+1):
+                # Calculate A(k, nn+1)
+                for j in range(1, K+1):
+                    tmp[k-1] += np.exp(-(j*np.pi)**2 * tau/2) * B[k-1, j-1, sign] * A[j-1]
+            for k in range(K):
+                A[k] = tmp[k]
+                tmp[k] = 0
             sign = 1-sign
 
+        p = 0
+        for k in range(1, K+1):
+            p += k * np.exp(-(k * np.pi)**2 * (tt - s[n])/2) * A[k-1]
 
+        return p
 
+    def calculate_full_pdf(self, x, a, z, v1, v2, s, NS, err):
 
+        if (s[0] != 0):
+            s = np.insert(s, 0, 0)
+
+        # Normalize values
+        a_sqr = a**2
+        w = z/a
+        tt = x/a_sqr
+        vv1 = v1*a
+        vv2 = v2*a
+        ss = s/a_sqr
+
+        n = bisect.bisect(ss, tt) - 1
+        p = self.calculate_Ak(tt, w, vv1, vv2, ss, n, err)
+        idx = 1
+        v = []
+        v.append(vv1)
+        v.append(vv2)
+        v_iter = v[idx]**2
+        sum_sqr_v = 0
+        for i in range(n+1):
+            v_iter = v[idx]**2
+            if i < n:
+                tau = (s[i+1] - s[i])
+            else:
+                tau = (tt - s[i])
+            sum_sqr_v += tau * v_iter
+            idx = 1-idx
+        pdf = p * np.pi * np.exp(-sum_sqr_v / 2) / (np.sqrt(2) * a_sqr)
+        return pdf
+
+    def calculate_pdf_array(self, x, a, z, v1, v2, s, NS, logp, err):
+        y = []
+        for i in range(x.shape[0]):
+            y.append(self.calculate_full_pdf(x[i], a, z, v1, v2, s, NS, err))
+        if logp == 1:
+            return np.log(y)
+        else:
+            return y
 
     def test_check_pdf_kernel(self, size=100):
 
-        x = np.linspace(0, 10, 1000)
-        x_size = x.shape[0]
+        x = np.linspace(0.225, 0.225, 1)
         v1 = 2
         v2 = 1
         sv = 0
         a = 1
         z = 0.5
         sz = 0
-        s = np.arange(0, 2, 0.1)
+        s = np.arange(0.1, 0.3, 0.05)
         t = 0
         st = 0
         err = 1e-4
         logp = 0
         s_size = s.shape[0]
-        swfpt.pdf_array(x, v1, v2, sv, a, z, sz, s, t, st, err, logp)
-        self.calculate_Ak(x, z, v1, v2, s, s_size, err)
-
-
+        pdf_expected = self.calculate_pdf_array(x, a, z, v1, v2, s, s_size, logp, err)
+        pdf_cython = swfpt.pdf_array(x, v1, v2, sv, a, z, sz, s, t, st, err, logp)
+        np.testing.assert_almost_equal(pdf_cython, pdf_expected)
 
 if __name__ == "__main__":
     test = TestABParams()
     test.test_check_B()
     test.test_check_Ak0()
     test.test_check_pdf_kernel()
-
