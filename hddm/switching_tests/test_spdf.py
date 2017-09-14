@@ -168,9 +168,9 @@ class TestABParams(unittest.TestCase):
         for i in range(n+1):
             v_iter = v[idx]**2
             if i < n:
-                tau = (s[i+1] - s[i])
+                tau = (ss[i+1] - ss[i])
             else:
-                tau = (tt - s[i])
+                tau = (tt - ss[i])
             sum_sqr_v += tau * v_iter
             idx = 1-idx
         pdf = p * np.pi * np.exp(-sum_sqr_v / 2) / (np.sqrt(2) * a_sqr)
@@ -187,11 +187,11 @@ class TestABParams(unittest.TestCase):
 
     def test_check_pdf_kernel(self, size=100):
 
-        x = np.linspace(0.225, 0.225, 1)
+        x = np.linspace(0.2, 0.4, 5)
         v1 = 2
         v2 = 1
         sv = 0
-        a = 1
+        a = 2
         z = 0.5
         sz = 0
         s = np.arange(0.1, 0.3, 0.05)
