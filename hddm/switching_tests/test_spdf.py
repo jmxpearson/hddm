@@ -195,10 +195,10 @@ class TestABParams(unittest.TestCase):
         z = 0.5
         sz = 0
         s = np.arange(0.1, 0.3, 0.05)
-        t = 0
+        t = 0.1
         st = 0
         err = 1e-4
-        logp = 0
+        logp = 1
         s_size = s.shape[0]
         pdf_expected = self.calculate_pdf_array(x, a, z, v1, v2, s, s_size, logp, err)
         pdf_cython = swfpt.pdf_array(x, v1, v2, sv, a, z, sz, s, t, st, err, logp)
