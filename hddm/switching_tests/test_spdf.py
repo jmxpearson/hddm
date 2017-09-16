@@ -12,16 +12,20 @@ class TestABParams(unittest.TestCase):
         pass
 
     def getExpectedValueB(self, j, k, dv, sign):
+        """
+        Numpy version of calculation of B coefficient (k, j) for drift rate
+        difference dv
+        Use sign = 1 for B+, sign = 0 for B-
+        """
         temp = 1.0 * (-1) ** (sign + 1)
         B = temp * 4.0 * np.pi**2 * j * k * dv * (((-1) ** (j + k) * np.exp(temp*dv) - 1)) / (2.0 * np.pi**2 * (j**2 + k**2) * dv**2 + 1.0*np.pi**4 * (j**2 - k**2)**2 + dv**4)
         return B
 
     def getExpectedValueAk0(self, k, v, y):
+        """
+        Numpy version of calculation of A_k{k, 0}(v, y)
+        """
         A = np.exp(-v * y) * np.sqrt(2) * np.sin(k * np.pi * y)
-        return A
-
-    def getExpectedValueAkj(self, k, v, y):
-        A = 0
         return A
 
     def test_check_B(self, size=100):
@@ -32,7 +36,7 @@ class TestABParams(unittest.TestCase):
         m = swfpt.BB(k, j, dv, sign)
         np.testing.assert_almost_equal(m, 0)
 
-        # Sign is negative
+        # Sign is positive
         j = 1
         k = 1
         dv = 1
@@ -41,7 +45,7 @@ class TestABParams(unittest.TestCase):
         m = swfpt.BB(k, j, dv, sign)
         np.testing.assert_almost_equal(m, expected)
 
-        # Sign is positive
+        # Sign is negative
         sign = 0
         expected = 0.61650432
         m = swfpt.BB(k, j, dv, sign)
@@ -96,6 +100,10 @@ class TestABParams(unittest.TestCase):
     #  n - number of elements in s before time t
 
     def calculate_Ak(self, tt, w, v1, v2, s, n, err):
+        """
+        Numpy version of calculation of pdf kernel
+        Compute the sum portion of the pdf using normalized variables
+        """
         K = 4
         A = np.array(np.zeros(K), dtype=np.double)
         tmp = np.array(np.zeros(K), dtype=np.double)
@@ -145,6 +153,17 @@ class TestABParams(unittest.TestCase):
         return p
 
     def calculate_full_pdf(self, x, a, z, v1, v2, s, NS, err):
+        """
+        Numpy version of calculation of full pdf
+        Compute the likelihood of the switching drift diffusion model
+        f(t|v1, v2, a, z, s) with switch times given by array s.
+        Normalize al lthe variables
+        v2 is the drift velocity for the first time segment, after which
+        diffusion alternates between v1 and v2 
+        """
+
+        if (z<0) or (z>a) or (a<0):
+            return 0
 
         if (s[0] != 0):
             s = np.insert(s, 0, 0)
@@ -177,6 +196,9 @@ class TestABParams(unittest.TestCase):
         return pdf
 
     def calculate_pdf_array(self, x, a, z, v1, v2, s, NS, logp, err):
+        """
+        Numpy version of calculating pdf array
+        """
         y = []
         for i in range(x.shape[0]):
             y.append(self.calculate_full_pdf(x[i], a, z, v1, v2, s, NS, err))
@@ -186,23 +208,22 @@ class TestABParams(unittest.TestCase):
             return y
 
     def test_check_pdf_kernel(self, size=100):
-
-        x = np.linspace(0.2, 0.4, 5)
-        v1 = 2
-        v2 = 1
         sv = 0
-        a = 2
-        z = 0.5
         sz = 0
-        s = np.arange(0.1, 0.3, 0.05)
-        t = 0.1
         st = 0
+        t = 0.1
         err = 1e-4
-        logp = 1
+        x = np.linspace(0.1, 1.0, 10)
+        s = np.linspace(0.1, 1.0, 10)
         s_size = s.shape[0]
-        pdf_expected = self.calculate_pdf_array(x, a, z, v1, v2, s, s_size, logp, err)
-        pdf_cython = swfpt.pdf_array(x, v1, v2, sv, a, z, sz, s, t, st, err, logp)
-        np.testing.assert_almost_equal(pdf_cython, pdf_expected)
+        for v1 in range(1, 5):
+            for v2 in range(1, 5):
+                for a in range(1, 5):
+                    for z in range(1, 5):
+                        for logp in (0, 1):
+                            pdf_expected = self.calculate_pdf_array(x, a, z, v1, v2, s, s_size, logp, err)
+                            pdf_cython = swfpt.pdf_array(x, v1, v2, sv, a, z, sz, s, t, st, err, logp)
+                            np.testing.assert_almost_equal(pdf_cython, pdf_expected, 6)
 
 if __name__ == "__main__":
     test = TestABParams()

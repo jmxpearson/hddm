@@ -175,7 +175,7 @@ cpdef double full_pdf(double x, double v1, double v2, double sv, double a, doubl
 
     # Check if parpameters are valid
     if (z<0) or (z>a) or (a<0) or (t<0) or (st<0) or (sv<0) or (sz<0) or (sz>1) or \
-       ((fabs(x)-(t-st/2.))<0) or (z+sz/2.>1) or (z-sz/2.<0) or (t-st/2.<0):
+       ((fabs(x)-(t-st/2.))<0) or (z+sz/2.>a) or (z-sz/2.<0) or (t-st/2.<0):
        return 0
 
     cdef Py_ssize_t ii
