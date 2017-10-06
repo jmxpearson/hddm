@@ -82,7 +82,7 @@ cdef double pdf_kernel(double tt, double w, double v1, double v2, double* s, int
     """
 
     # TODO: compute number of terms needed...
-    cdef int K = 4
+    cdef int K = 6
     cdef double *A = <double *> malloc(K * sizeof(double))
     cdef double *tmp = <double *> malloc(K * sizeof(double))
 
