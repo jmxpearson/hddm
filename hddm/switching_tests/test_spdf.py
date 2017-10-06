@@ -99,12 +99,11 @@ class TestABParams(unittest.TestCase):
     #  s - Switching times
     #  n - number of elements in s before time t
 
-    def calculate_Ak(self, tt, w, v1, v2, s, n, err):
+    def calculate_Ak(self, K, tt, w, v1, v2, s, n, err):
         """
         Numpy version of calculation of pdf kernel
         Compute the sum portion of the pdf using normalized variables
         """
-        K = 4
         A = np.array(np.zeros(K), dtype=np.double)
         tmp = np.array(np.zeros(K), dtype=np.double)
         k_val = np.arange(1, K+1)
@@ -152,7 +151,7 @@ class TestABParams(unittest.TestCase):
 
         return p
 
-    def calculate_full_pdf(self, x, a, z, v1, v2, s, NS, err):
+    def calculate_full_pdf(self, K, x, a, z, v1, v2, s, NS, err):
         """
         Numpy version of calculation of full pdf
         Compute the likelihood of the switching drift diffusion model
@@ -177,7 +176,7 @@ class TestABParams(unittest.TestCase):
         ss = s/a_sqr
 
         n = bisect.bisect(ss, tt) - 1
-        p = self.calculate_Ak(tt, w, vv1, vv2, ss, n, err)
+        p = self.calculate_Ak(K, tt, w, vv1, vv2, ss, n, err)
         idx = 1
         v = []
         v.append(vv1)
@@ -195,19 +194,67 @@ class TestABParams(unittest.TestCase):
         pdf = p * np.pi * np.exp(-sum_sqr_v / 2) / (np.sqrt(2) * a_sqr)
         return pdf
 
-    def calculate_pdf_array(self, x, a, z, v1, v2, s, NS, logp, err):
+    def calculate_pdf_array(self, K, x, a, z, v1, v2, s, NS, logp, err):
         """
         Numpy version of calculating pdf array
         """
         y = []
         for i in range(x.shape[0]):
-            y.append(self.calculate_full_pdf(x[i], a, z, v1, v2, s, NS, err))
+            y.append(self.calculate_full_pdf(K, x[i], a, z, v1, v2, s, NS, err))
         if logp == 1:
-            return np.log(y)
+            return np.array(np.log(y))
         else:
-            return y
+            return np.array(y)
+
+    def get_lambda(self, k):
+        return ((k**2) * (np.pi**2)) / 2
+
+    def calculate_error_bound(self, K, x, a, z, v1, v2, s, NS, err):
+        """
+        Numpy calculation of crude error bounding term
+        """
+        if (s[0] != 0):
+            s = np.insert(s, 0, 0)
+        # Normalize values
+        a_sqr = a**2
+        w = z/a
+        tt = x/a_sqr
+        vv1 = v1*a
+        vv2 = v2*a
+        ss = s/a_sqr
+
+        n = bisect.bisect(ss, tt) - 1
+        if (vv1**2 < vv2**2):
+            V0 = (vv1/2)**2
+        else:
+            V0 = (vv2/2)**2
+        V1 = np.abs(vv1)/2
+        if (np.abs(vv2) > np.abs(vv1)):
+            V1 = np.abs(vv2)/2
+        diff = np.diff(ss)
+        tau_min = np.amin(diff)
+        const = np.sqrt(2*(np.pi**3)) * a_sqr
+
+        error = (n+1) * np.exp(V1*n - n*V0*tau_min) * (tau_min ** (-3/2))
+        error *= np.exp(-np.pi**2 * K**2 * tau_min)/const
+        return error
+
+
+    def calculate_error_bound_array(self, K, x, a, z, v1, v2, s, NS, logp, err):
+        """
+        Numpy version of calculating error for pdf array
+        """
+        y = []
+        for i in range(x.shape[0]):
+            y.append(self.calculate_error_bound(K, x[i], a, z, v1, v2, s, NS, err))
+        return y
+
+
 
     def test_check_pdf_kernel(self, size=100):
+        """
+        Test to check pdf values
+        """
         sv = 0
         sz = 0
         st = 0
@@ -216,17 +263,45 @@ class TestABParams(unittest.TestCase):
         x = np.linspace(0.1, 1.0, 10)
         s = np.linspace(0.1, 1.0, 10)
         s_size = s.shape[0]
+        K = 6
         for v1 in range(1, 5):
             for v2 in range(1, 5):
                 for a in range(1, 5):
                     for z in range(1, 5):
                         for logp in (0, 1):
-                            pdf_expected = self.calculate_pdf_array(x, a, z, v1, v2, s, s_size, logp, err)
+                            pdf_expected = self.calculate_pdf_array(K, x, a, z, v1, v2, s, s_size, logp, err)
                             pdf_cython = swfpt.pdf_array(x, v1, v2, sv, a, z, sz, s, t, st, err, logp)
-                            np.testing.assert_almost_equal(pdf_cython, pdf_expected, 6)
+                            np.testing.assert_almost_equal(pdf_cython, pdf_expected)
+
+    def test_check_pdf_kernel_error(self, size=100):
+        """
+        Test to check error bound pdf values
+        """
+        sv = 0
+        sz = 0
+        st = 0
+        t = 0.1
+        err = 1e-4
+        x = np.linspace(0.1, 1.0, 10)
+        s = np.linspace(0.1, 1.0, 10)
+        s_size = s.shape[0]
+        K = 2
+        for v1 in range(1, 5):
+            for v2 in range(1, 5):
+                for a in range(1, 5):
+                    for z in range(1, 5):
+                        for logp in (0, 0):
+                            pdf_K = self.calculate_pdf_array(K, x, a, z, v1, v2, s, s_size, logp, err)
+                            pdf_expected = self.calculate_pdf_array(3, x, a, z, v1, v2, s, s_size, logp, err)
+                            error_exp = self.calculate_error_bound_array(K, x, a, z, v1, v2, s, s_size, logp, err)
+                            error_arr = pdf_expected - pdf_K
+                            error = np.abs(error_arr)
+                            if (not np.isnan(error).all()):
+                                np.testing.assert_array_less(error, error_exp, "Error is not bounded")
 
 if __name__ == "__main__":
     test = TestABParams()
     test.test_check_B()
     test.test_check_Ak0()
     test.test_check_pdf_kernel()
+    test.test_check_pdf_kernel_error()
