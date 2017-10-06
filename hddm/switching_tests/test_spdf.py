@@ -285,14 +285,14 @@ class TestABParams(unittest.TestCase):
         x = np.linspace(0.1, 1.0, 10)
         s = np.linspace(0.1, 1.0, 10)
         s_size = s.shape[0]
-        K = 2
+        K = 6
         for v1 in range(1, 5):
             for v2 in range(1, 5):
                 for a in range(1, 5):
                     for z in range(1, 5):
                         for logp in (0, 0):
                             pdf_K = self.calculate_pdf_array(K, x, a, z, v1, v2, s, s_size, logp, err)
-                            pdf_expected = self.calculate_pdf_array(3, x, a, z, v1, v2, s, s_size, logp, err)
+                            pdf_expected = self.calculate_pdf_array(10, x, a, z, v1, v2, s, s_size, logp, err)
                             error_exp = self.calculate_error_bound_array(K, x, a, z, v1, v2, s, s_size, logp, err)
                             error_arr = pdf_expected - pdf_K
                             error = np.abs(error_arr)
