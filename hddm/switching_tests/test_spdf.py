@@ -209,7 +209,7 @@ class TestABParams(unittest.TestCase):
     def get_lambda(self, k):
         return ((k**2) * (np.pi**2)) / 2
 
-    def calculate_error_bound(self, K, x, a, z, v1, v2, s, NS, err):
+    def calculate_crude_error_bound(self, K, x, a, z, v1, v2, s):
         """
         Numpy calculation of crude error bounding term
         """
@@ -224,13 +224,11 @@ class TestABParams(unittest.TestCase):
         ss = s/a_sqr
 
         n = bisect.bisect(ss, tt) - 1
-        if (vv1**2 < vv2**2):
-            V0 = (vv1/2)**2
-        else:
+        V0 = (vv1/2)**2
+        V1 = np.abs(vv2)/2
+        if (vv1**2 > vv2**2):
             V0 = (vv2/2)**2
-        V1 = np.abs(vv1)/2
-        if (np.abs(vv2) > np.abs(vv1)):
-            V1 = np.abs(vv2)/2
+            V1 = np.abs(vv1)/2
         diff = np.diff(ss)
         tau_min = np.amin(diff)
         const = np.sqrt(2*(np.pi**3)) * a_sqr
@@ -240,13 +238,55 @@ class TestABParams(unittest.TestCase):
         return error
 
 
-    def calculate_error_bound_array(self, K, x, a, z, v1, v2, s, NS, logp, err):
+    def calculate_crude_error_bound_array(self, K, x, a, z, v1, v2, s):
         """
-        Numpy version of calculating error for pdf array
+        Numpy version of calculating crude error for pdf array
         """
         y = []
         for i in range(x.shape[0]):
-            y.append(self.calculate_error_bound(K, x[i], a, z, v1, v2, s, NS, err))
+            y.append(self.calculate_crude_error_bound(K, x[i], a, z, v1, v2, s))
+        return y
+
+    def calculate_strict_error_bound(self, K, x, a, z, v1, v2, s):
+        """
+        Numpy calculation of fine error bounding term
+        """
+        if (s[0] != 0):
+            s = np.insert(s, 0, 0)
+        # Normalize values
+        a_sqr = a**2
+        w = z/a
+        tt = x/a_sqr
+        vv1 = v1*a
+        vv2 = v2*a
+        ss = s/a_sqr
+
+        n = bisect.bisect(ss, tt) - 1
+        V0 = (vv1/2)**2
+        V1 = np.abs(vv2)/2
+        if (vv1**2 > vv2**2):
+            V0 = (vv2/2)**2
+            V1 = np.abs(vv1)/2
+        diff = np.diff(ss)
+        tau_last = (tt - ss[n])
+        sum_exp = 0
+        for i in range(0, n):
+            sum_exp += np.exp(-K**2 * np.pi**2 * diff[i])
+        const = np.pi * np.sqrt(2*np.pi*diff[0]) * a_sqr
+
+        error = np.exp(V1*n - V0*ss[n] - self.get_lambda(1)*tau_last)
+        error *= sum_exp
+        error /= (const * tau_last)
+        return error
+
+
+    def calculate_strict_error_bound_array(self, K, x, a, z, v1, v2, s):
+        """
+        Numpy version of calculating fine error for pdf array
+        """
+        y = []
+        for i in range(x.shape[0]):
+            y.append(self.calculate_strict_error_bound(K, x[i], a, z, v1, v2, s))
         return y
 
 
@@ -282,22 +322,25 @@ class TestABParams(unittest.TestCase):
         st = 0
         t = 0.1
         err = 1e-4
-        x = np.linspace(0.1, 1.0, 10)
+        x = np.linspace(0.15, 1.05, 10)
         s = np.linspace(0.1, 1.0, 10)
         s_size = s.shape[0]
         K = 6
+        logp = 0
         for v1 in range(1, 5):
             for v2 in range(1, 5):
                 for a in range(1, 5):
                     for z in range(1, 5):
-                        for logp in (0, 0):
-                            pdf_K = self.calculate_pdf_array(K, x, a, z, v1, v2, s, s_size, logp, err)
-                            pdf_expected = self.calculate_pdf_array(10, x, a, z, v1, v2, s, s_size, logp, err)
-                            error_exp = self.calculate_error_bound_array(K, x, a, z, v1, v2, s, s_size, logp, err)
-                            error_arr = pdf_expected - pdf_K
-                            error = np.abs(error_arr)
-                            if (not np.isnan(error).all()):
-                                np.testing.assert_array_less(error, error_exp, "Error is not bounded")
+                        pdf_K = self.calculate_pdf_array(K, x, a, z, v1, v2, s, s_size, logp, err)
+                        pdf_expected = self.calculate_pdf_array(10, x, a, z, v1, v2, s, s_size, logp, err)
+                        error_exp_crude = self.calculate_crude_error_bound_array(K, x, a, z, v1, v2, s)
+                        error_exp_strict = self.calculate_strict_error_bound_array(K, x, a, z, v1, v2, s)
+                        error_arr = pdf_expected - pdf_K
+                        error = np.abs(error_arr)
+                        if (not np.isnan(error).all()):
+                            np.testing.assert_array_less(error, error_exp_crude, "Error is not bounded")
+                            np.testing.assert_array_less(error, error_exp_strict, "Error is not bounded strictly")
+                            #np.testing.assert_array_less(error_exp_crude, error_exp_strict, "Crude error is less than strict error")
 
 if __name__ == "__main__":
     test = TestABParams()
