@@ -231,6 +231,9 @@ class TestABParams(unittest.TestCase):
             V1 = np.abs(vv1)/2
         diff = np.diff(ss)
         tau_min = np.amin(diff)
+        if (tau_min > tt-ss[n]):
+            tau_min = tt-ss[n]
+
         const = np.sqrt(2*(np.pi**3)) * a_sqr
 
         error = (n+1) * np.exp(V1*n - n*V0*tau_min) * (tau_min ** (-3/2))
@@ -340,7 +343,7 @@ class TestABParams(unittest.TestCase):
                         if (not np.isnan(error).all()):
                             np.testing.assert_array_less(error, error_exp_crude, "Error is not bounded")
                             np.testing.assert_array_less(error, error_exp_strict, "Error is not bounded strictly")
-                            #np.testing.assert_array_less(error_exp_crude, error_exp_strict, "Crude error is less than strict error")
+                            np.testing.assert_array_less(error_exp_strict, error_exp_crude, "Crude error is more than strict error")
 
 if __name__ == "__main__":
     test = TestABParams()
